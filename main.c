@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <termios.h>
+#include <ctype.h>
 
 struct termios original_state; // this stores the initial state of the terminal
 
@@ -43,8 +44,20 @@ int main()
 {
 	enableRawMode();
 	char c;
-		
-	while(read(STDIN_FILENO,&c,1)==1 && c !='q');
+	
+	// the iscntrl() function is used to check whether a character is a control character or not
+	// control characters are non printable characters which controls the behaviour of the device or interpret text such as Enter, Backspace
+	// ASCII codes from 0 - 31 and 127 are control characters
+	
+	while(read(STDIN_FILENO,&c,1)==1 && c !='q'){
+		if (iscntrl(c)){
+			printf("%d\n",c);
+		}
+
+		else {
+			printf("%d ('%c')\n", c, c);
+		}
+	}
 	printf("Ballz\n");
 	return 0;
 }
