@@ -33,7 +33,13 @@ void enableRawMode()
 		
 		There is an ICANON flag that allows us to turn off canonical/cooked mode which means that we will read the input byte-by-byte instead of line by line. ICANON comes from termios.h and although it started with an I which is typical for input flags, it is a local flag. ICANON = Canonical Input	
 	*/
-	raw.c_lflag &= ~(ECHO | ICANON);
+	
+	// ISIG flag is used for enabling signals, disabling it would effectly render CTRL-C and CTRL-Z useless.
+	// IEXTEN is used to enable extended input character procerssing aka CTRL-V where the following character is inserted literally without performing any associated action
+	raw.c_lflag &= ~(ECHO | ICANON | ISIG | IEXTEN);
+	// IXON enables the start/stop output control and IXOFF enables start/stop input control aka CTRL-S and CTRL-Q
+	// c_iflag because IXON is an input flag	
+	raw.c_iflag &= ~(IXON);
 
 	// we can then set the modified raw struct value back to the terminal attribute with the tcsetattr() function
 	tcsetattr(STDIN_FILENO, TCSAFLUSH,&raw);
