@@ -6,16 +6,24 @@
 
 struct termios original_state; // this stores the initial state of the terminal
 
+void onerror(const char* err)
+{
+	perror(err);
+	exit(1);
+}
+
 void disableRawMode()
 {
-	tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_state);
+	if( tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_state) == -1)
+		onerror("tcsetattr");
 }
 
 void enableRawMode()
 {
 		
 	// the tcgetattr() function will get all the terminal attributes and store it in the raw struct
-	tcgetattr(STDIN_FILENO, &original_state);
+	if( tcgetattr(STDIN_FILENO, &original_state) == -1)
+		onerror("tcgetattr");
 	
 	// atexit is a library function from stdlib.h where the disableRawMode function gets called automatically when the program exits by either returning to main function or by calling the exit() function 
 	atexit(disableRawMode);	
@@ -60,7 +68,8 @@ void enableRawMode()
 
 	// we can then set the modified raw struct value back to the terminal attribute with the tcsetattr() function
 
-	tcsetattr(STDIN_FILENO, TCSAFLUSH,&raw);
+	if ( tcsetattr(STDIN_FILENO, TCSAFLUSH,&raw) == -1) 
+		onerror("tcsetattr");
 	
 	// one thing to note is that this function permanently changes the terminal's attributes for the current session so we will create a function to restore the terminal to its original state	
 }
