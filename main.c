@@ -37,11 +37,29 @@ void enableRawMode()
 	// ISIG flag is used for enabling signals, disabling it would effectly render CTRL-C and CTRL-Z useless.
 	// IEXTEN is used to enable extended input character procerssing aka CTRL-V where the following character is inserted literally without performing any associated action
 	raw.c_lflag &= ~(ECHO | ICANON | ISIG | IEXTEN);
+
 	// IXON enables the start/stop output control and IXOFF enables start/stop input control aka CTRL-S and CTRL-Q
 	// c_iflag because IXON is an input flag	
-	raw.c_iflag &= ~(IXON);
+	// CTRL-M is being read as 10, which is the same value as Enter, which is the same value as CTRL-J. This means that the terminal is translating carriage returns (CR) into newline (NL). We can use the ICRNL feature to toggle this.
+	// carriage return is used to reset the device's position to the beginning of a line
+	// BRKINT causes a SIGINT during a break condition	
+	// INPCK enables parity checking
+	// ISTRIP causes the 8th bit of every input byte to be stripped (set to 0)
+
+	raw.c_iflag &= ~(IXON | ICRNL | BRKINT | INPCK | ISTRIP);
+
+	// OPOST flag is used to post-process output, or output processing features such as the \n translation into \r\n. This will cause the newline to start directly below and not to the left of the terminal. We can fix this by simply hard coding \r\n into our print statement in the main function. 
+	raw.c_oflag &= ~(OPOST);
+
+	// we also need to turn off a control bitmask CS8 or character size 8, setting the character size to 8 bits per byte.
+	// it has to be set instead of being turned off by using the bitwise or | operator
+	raw.c_cflag |= (CS8);	
+	
+	raw.c_cc[VMIN] = 0;
+	raw.c_cc[VTIME] = 100;
 
 	// we can then set the modified raw struct value back to the terminal attribute with the tcsetattr() function
+
 	tcsetattr(STDIN_FILENO, TCSAFLUSH,&raw);
 	
 	// one thing to note is that this function permanently changes the terminal's attributes for the current session so we will create a function to restore the terminal to its original state	
@@ -49,22 +67,27 @@ void enableRawMode()
 int main()
 {
 	enableRawMode();
-	char c;
 	
 	// the iscntrl() function is used to check whether a character is a control character or not
 	// control characters are non printable characters which controls the behaviour of the device or interpret text such as Enter, Backspace
 	// ASCII codes from 0 - 31 and 127 are control characters
 	
-	while(read(STDIN_FILENO,&c,1)==1 && c !='q'){
+	while(1){
+		char c = '\0';
+		read(STDIN_FILENO,&c,1);		
+	
 		if (iscntrl(c)){
-			printf("%d\n",c);
+			printf("%d\r\n",c);
 		}
 
 		else {
-			printf("%d ('%c')\n", c, c);
+			printf("%d ('%c')\r\n", c, c);
 		}
+		
+		if (c == 'q') break;
 	}
-	printf("Ballz\n");
+
+	printf("Ballz\r\n");
 	return 0;
 }
 
