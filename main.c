@@ -1,11 +1,19 @@
+/*** include ***/
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <termios.h>
 #include <ctype.h>
 
+/*** define ***/
+#define CTRL_KEY(k) ((k) & 0x1f) // this macro stimulates what the usual CTRL does in the terminal
+// the 0x1f in binary is 00011111 so this macro strips the upper 3 bits of the character
+
+/*** structure data ***/
 struct termios original_state; // this stores the initial state of the terminal
 
+/*** terminal functions ***/
 void onerror(const char* err)
 {
 	perror(err);
@@ -73,6 +81,36 @@ void enableRawMode()
 	
 	// one thing to note is that this function permanently changes the terminal's attributes for the current session so we will create a function to restore the terminal to its original state	
 }
+
+/*** character input ***/
+char ReadKey()
+{
+	ssize_t read_num;
+	char c;
+	
+	while (( read_num = read(STDIN_FILENO, &c, 1 )) != 1 ) // this waits for an input from the user
+	{ 
+		if ( read_num == -1 && errno != EAGAIN ) onerror("read");
+	}
+	return c;
+}
+
+void ProcessKeypress()				// we'll use this for our character input
+{
+	char c = ReadKey();
+	
+	switch (c)
+	{
+		case CTRL_KEY('q'):
+			exit(0);
+			break;
+	}
+}
+
+
+
+
+/*** init ***/
 int main()
 {
 	enableRawMode();
@@ -81,19 +119,9 @@ int main()
 	// control characters are non printable characters which controls the behaviour of the device or interpret text such as Enter, Backspace
 	// ASCII codes from 0 - 31 and 127 are control characters
 	
-	while(1){
-		char c = '\0';
-		read(STDIN_FILENO,&c,1);		
-	
-		if (iscntrl(c)){
-			printf("%d\r\n",c);
-		}
-
-		else {
-			printf("%d ('%c')\r\n", c, c);
-		}
-		
-		if (c == 'q') break;
+	while(1)
+	{	
+		ProcessKeypress();
 	}
 
 	printf("Ballz\r\n");
