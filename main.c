@@ -10,13 +10,23 @@
 
 /*** define ***/
 #define CTRL_KEY(k) ((k) & 0x1f) // this macro stimulates what the usual CTRL does in the terminal
+#define BLOATPAD_VER "0.0.1"
 // the 0x1f in binary is 00011111 so this macro strips the upper 3 bits of the character
 #define ABUF_INIT {NULL, 0} 	// it is a constant which represents an epmty buffer {buffer, length}. Acts as a constructor for our abuf struct
 
+// enum is a specfial data type that represents a group of constants
+enum editorKey 
+{
+	ARROW_LEFT = 1000,
+	ARROW_RIGHT,
+	ARROW_UP,
+	ARROW_DOWN 
+};
 
 /*** structure data ***/
 // this global struct will contain our editor state from which we can store the width and height of the terminal
 struct editorConfiguration{
+	int cursor_x, cursor_y;
 	int screenrows;
 	int screencols;
 	struct termios original_state; // this stores the initial state of the terminal
@@ -117,7 +127,40 @@ int getWindowSize(int *rows, int *columns) 	// this helps us to get the screen s
 }
 
 /*** character input ***/
-char ReadKey()
+void MoveCursor(int key)
+{
+	switch (key)
+	{
+		case ARROW_LEFT:
+		if (E.cursor_x != 0)
+		{
+			E.cursor_x--;
+		}
+		break;
+
+		case ARROW_DOWN:
+		if (E.cursor_y != E.screenrows - 1)
+		{
+			E.cursor_y++;
+		}
+		break;
+
+		case ARROW_RIGHT:
+		if (E.cursor_x != E.screencols - 1)
+		{
+			E.cursor_x++;
+		}
+		break;
+
+		case ARROW_UP:
+		if (E.cursor_y != 0) 
+		{
+			E.cursor_y--;	
+		}
+		break;
+	}
+}
+int ReadKey()
 {
 	ssize_t read_num;
 	char c;
@@ -127,11 +170,43 @@ char ReadKey()
 		if ( read_num == -1 && errno != EAGAIN ) onerror("read");
 	}
 	return c;
+
+	// pressing an arrow key often sends multiple bytes as input to our program. These bytes are in the form of an escape sequence that starts with 'x\1b', '[' followed by an A,B,C or D depending on the arrow key pressed. The code below checks for those arrow key presses and modifies it into a single key press.  
+
+	// If we read an escape character, we will immediately read two more bytes into the seq buffer. 
+	// If the escape character it not the Escape key, we will check to see if the escape sequence is an arrow key escape sequence, which returns the corresponding w a s d character if it is. But in case of it not being the escape character, we will return the escape character. 
+	// essentially, we have aliased our w a s d keys with the arrow keys
+
+	if (c == '\x1b')
+	{
+		char seq[3];
+		
+		if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b';
+		if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
+
+		if (seq[0] == '[') 
+		{
+			switch (seq[1])
+			{
+				case 'A': return ARROW_UP;
+				case 'B': return ARROW_DOWN;
+				case 'C': return ARROW_RIGHT;
+				case 'D': return ARROW_LEFT;
+			}
+		}
+		
+		return '\x1b';
+	}
+	
+	else
+	{
+		return c;
+	}
 }
 
 void ProcessKeypress()				// we'll use this for our character input
 {
-	char c = ReadKey();
+	int c = ReadKey();
 	
 	switch (c)
 	{
@@ -139,7 +214,17 @@ void ProcessKeypress()				// we'll use this for our character input
 			RefreshScreen();
 			exit(0);
 			break;
+		
+		// this will case a fallback which ensures that regardless of the case w,a,s or d, the MoveCursor function will be called.
+		case ARROW_UP:
+		case ARROW_DOWN:
+		case ARROW_RIGHT:
+		case ARROW_LEFT:
+			MoveCursor(c);
+			break;
 	}
+	
+	
 }
 
 /*** append buffer ***/
@@ -155,8 +240,7 @@ struct abuf
 void abAppend(struct abuf *ab, const char* s, int len)
 {
 	char *mem_alloc = realloc(ab->b, ab->len + len);
-
-	if (mem_alloc == NULL) return;
+if (mem_alloc == NULL) return;
 	//memcpy copies len bytes from the source string s to the position new + ab->len (i.e., appending s to the end of the existing buffer).
 	memcpy(&mem_alloc[ab->len],s,len);
 	ab->b = mem_alloc;
@@ -175,7 +259,33 @@ void DrawRows(struct abuf *ab)
 	int x;
 	for (x = 0; x <= E.screenrows; x++)
 	{
-		abAppend(ab "~", 1);
+		if (x == E.screenrows / 3) 
+		{
+			char welcome[80];
+			int len_welcome = snprintf(welcome, sizeof(welcome), " Bloatpad -- version %s", BLOATPAD_VER);
+			
+			if ( len_welcome > E.screencols ) len_welcome = E.screencols;
+						
+			// we do this in order to center it 
+			// To center a string, you divide its width by 2 and subtract the half of the string's length from that
+			int padding = (E.screencols - len_welcome) / 2;
+			
+			if (padding)
+			{
+				abAppend(ab, "~", 1);
+				padding--;
+			}
+
+			while (padding--) abAppend(ab, " ", 1);
+
+			// this appends the version number output to the buffer
+			abAppend(ab, welcome, len_welcome);
+
+		}
+		else
+		{
+			abAppend(ab,"~", 1);
+		}
 
 		if (x < E.screenrows - 1) 
 		{
@@ -193,14 +303,23 @@ void RefreshScreen()
 	// 
 	// the 4 indicates that 4 byts of data is being written
 	struct abuf ab = ABUF_INIT;
-
-	abAppend(&ab, "\x1b[2J", 4);
+	
+	// The ?25l makes the cursor invisible the cursor is visible when the l is replaced with a h. https://vt100.net/docs/vt510-rm/DECTCEM.html
+	abAppend(&ab, "\x1b[?25l", 6);
+	// NOTE: the 2J was replaced with a K here. K erases a part of the current line and its arguments are similar to that of J, 2 erases the whole line, 1 erases the part of line to the left of the cursor and 0 erases the part of the line to the right of the cursor, and is the default argument.
+	abAppend(&ab, "\x1b[K", 4);
 
 	// This escape sequence is 3 bytes long and makes use of the H command (cursor position) to position the cursor. It takes two arguments row and column number. So, if you have a 100x50 size terminal, you can use the command <esc>[25;50H (we separate multiple commands using ;). 
 	abAppend(&ab, "\x1b[H", 3);
 	DrawRows(&ab);
-	abAppend(&ab, "\x1b[H", 3);
-	
+
+
+	// We changed the old H command with the H command with arguments, specifying the exact position we want the cursor to move to.
+	// We also add 1 to both the coordinates to convert it from a 0 index value to a 1 indexed value.	
+	char buf[32];
+	snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cursor_y + 1, E.cursor_x + 1);
+	abAppend(&ab, buf, strlen(buf));
+	abAppend(&ab, "\x1b[?25h", 6);
 	// instead of a number of small writes, what we have done is appended all the writes that we might have to do into a single buffer and then written it. We also have to free the allocated memory space.
 	write(STDOUT_FILENO, ab.b, ab.len);
 
@@ -212,6 +331,10 @@ void RefreshScreen()
 /*** init ***/
 void initializeEditor()
 {
+	// this is the initial cursor position values which we have set to 0. cursor_x is the horizontal coordinate and cursor_y is the vertical coordinate.
+	E.cursor_x = 0;
+	E.cursor_y = 0;
+
 	if (getWindowSize(&E.screenrows, &E.screencols) == -1)			// We have passed the addresses of the struct members which will be used to set int references in the getWindowSize function. 
 		onerror("getWindowsSize");
 }
