@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <termios.h>
+#include <sys/types.h>
 #include <ctype.h>
 #include <sys/ioctl.h>
 
@@ -13,6 +14,9 @@
 #define BLOATPAD_VER "0.0.1"
 // the 0x1f in binary is 00011111 so this macro strips the upper 3 bits of the character
 #define ABUF_INIT {NULL, 0} 	// it is a constant which represents an epmty buffer {buffer, length}. Acts as a constructor for our abuf struct
+#define _GNU_SOURCE
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
 
 // enum is a specfial data type that represents a group of constants
 enum editorKey 
@@ -29,10 +33,20 @@ enum editorKey
 
 /*** structure data ***/
 // this global struct will contain our editor state from which we can store the width and height of the terminal
+
+typedef struct editorRow
+{
+	int size;
+	char* chars;
+}editorRow;
+
+
 struct editorConfiguration{
 	int cursor_x, cursor_y;
 	int screenrows;
 	int screencols;
+	int numrows;
+	editorRow row;
 	struct termios original_state; // this stores the initial state of the terminal
 };
 
@@ -130,6 +144,34 @@ int getWindowSize(int *rows, int *columns) 	// this helps us to get the screen s
 	}
 }
 
+/*** file i/o ***/
+
+// the editorOpen function takes a filename and opens the file for reading. The filename should be included as the first argument to the program (./main)
+
+void editorOpen(char* filename)
+{
+	FILE *fp = fopen(filename, "r");
+	if (!fp) onerror("fopen");
+
+	ssize_t linelen;
+	char* line = NULL;
+	size_t linecap = 0;		// linecap or line capacity shows you the length of the line it read and -1 if its at the end of the file and there are no more lines to read 
+	linelen = getline(&line, &linecap, fp);
+	if (linelen != -1)
+	{
+		while (linelen > 0 && (line[linelen - 1] == '\n' || line[linelen - 1] == '\r') )
+			linelen--;
+
+		E.row.size = linelen;
+		E.row.chars = malloc(linelen + 1);
+		memcpy(E.row.chars, line, linelen);
+		E.row.chars[linelen] = '\0';
+		E.numrows = 1;
+	}
+	
+	free(line);
+	fclose(fp);
+}
 /*** character input ***/
 void MoveCursor(int key)
 {
@@ -298,34 +340,43 @@ void DrawRows(struct abuf *ab)
 	int x;
 	for (x = 0; x <= E.screenrows; x++)
 	{
-		if (x == E.screenrows / 3) 
+		if (x >= E.numrows)
 		{
-			char welcome[80];
-			int len_welcome = snprintf(welcome, sizeof(welcome), " Bloatpad -- version %s", BLOATPAD_VER);
-			
-			if ( len_welcome > E.screencols ) len_welcome = E.screencols;
-						
-			// we do this in order to center it 
-			// To center a string, you divide its width by 2 and subtract the half of the string's length from that
-			int padding = (E.screencols - len_welcome) / 2;
-			
-			if (padding)
+			if (E.numrows == 0 && x == E.screenrows / 3)		// in case we have no file passed as argument, it will show the welcome sign. 
 			{
-				abAppend(ab, "~", 1);
-				padding--;
+				char welcome[80];
+				int len_welcome = snprintf(welcome, sizeof(welcome), " Bloatpad -- version %s", BLOATPAD_VER);
+				
+				if ( len_welcome > E.screencols ) len_welcome = E.screencols;
+							
+				// we do this in order to center it 
+				// To center a string, you divide its width by 2 and subtract the half of the string's length from that
+				int padding = (E.screencols - len_welcome) / 2;
+				
+				if (padding)
+				{
+					abAppend(ab, "~", 1);
+					padding--;
+				}
+
+				while (padding--) abAppend(ab, " ", 1);
+
+				// this appends the version number output to the buffer
+				abAppend(ab, welcome, len_welcome);
+
 			}
-
-			while (padding--) abAppend(ab, " ", 1);
-
-			// this appends the version number output to the buffer
-			abAppend(ab, welcome, len_welcome);
-
+			else
+			{
+				abAppend(ab,"~", 1);
+			}
 		}
+		
 		else
 		{
-			abAppend(ab,"~", 1);
-		}
-
+			int len = E.row.size;
+			if (len > E.screencols) len = E.screencols;
+			abAppend(ab, E.row.chars, len);
+		}	
 		if (x < E.screenrows - 1) 
 		{
 			abAppend(ab, "\r\n", 2);		// this ensures that the last line of the editor isnt empty and has a tilda ~
@@ -373,12 +424,13 @@ void initializeEditor()
 	// this is the initial cursor position values which we have set to 0. cursor_x is the horizontal coordinate and cursor_y is the vertical coordinate.
 	E.cursor_x = 0;
 	E.cursor_y = 0;
+	E.numrows = 0;
 
 	if (getWindowSize(&E.screenrows, &E.screencols) == -1)			// We have passed the addresses of the struct members which will be used to set int references in the getWindowSize function. 
 		onerror("getWindowsSize");
 }
 
-int main()
+int main(int argc, char* argv[])
 {
 	enableRawMode();
 	initializeEditor();	
@@ -386,6 +438,11 @@ int main()
 	// control characters are non printable characters which controls the behaviour of the device or interpret text such as Enter, Backspace
 	// ASCII codes from 0 - 31 and 127 are control characters
 	
+	if (argc >= 2)
+	{
+		editorOpen(argv[1]);
+	}
+
 	while(1)
 	{	
 		RefreshScreen();
