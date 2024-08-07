@@ -46,7 +46,7 @@ struct editorConfiguration{
 	int screenrows;
 	int screencols;
 	int numrows;
-	editorRow row;
+	editorRow *row;
 	struct termios original_state; // this stores the initial state of the terminal
 };
 
@@ -144,6 +144,26 @@ int getWindowSize(int *rows, int *columns) 	// this helps us to get the screen s
 	}
 }
 
+/*** row operations ***/
+void AppendRow(char* s, size_t line_length)
+{
+		// we want the function to allocate space for a new editor row and then copy the given string to a new erow at the end of the E.row array.
+		
+		// we have to tell realloc() how many bytes we want to allocate. We multiply the number of bytes each previous editor row takes i.e. sizeof(erow) and multiply it with the number of rows we want
+		E.row = realloc(E.row, sizeof(editorRow) * (E.numrows + 1) );
+
+		// we also set at to the index of the new row we want to initialize and replace each occurrence of E.row with E.row[at]
+		int at = E.numrows;
+		E.row[at].size = line_length;
+		E.row[at].chars = malloc(line_length + 1);
+		memcpy(E.row[at].chars, s, line_length);
+		E.row[at].chars[line_length] = '\0';
+		
+		// we also should increment the number of rows by 1 for each instance of function call
+		E.numrows++;
+}
+	
+
 /*** file i/o ***/
 
 // the editorOpen function takes a filename and opens the file for reading. The filename should be included as the first argument to the program (./main)
@@ -156,17 +176,11 @@ void editorOpen(char* filename)
 	ssize_t linelen;
 	char* line = NULL;
 	size_t linecap = 0;		// linecap or line capacity shows you the length of the line it read and -1 if its at the end of the file and there are no more lines to read 
-	linelen = getline(&line, &linecap, fp);
-	if (linelen != -1)
+	while ( (linelen = getline(&line, &linecap, fp) ) != -1)
 	{
 		while (linelen > 0 && (line[linelen - 1] == '\n' || line[linelen - 1] == '\r') )
 			linelen--;
-
-		E.row.size = linelen;
-		E.row.chars = malloc(linelen + 1);
-		memcpy(E.row.chars, line, linelen);
-		E.row.chars[linelen] = '\0';
-		E.numrows = 1;
+		AppendRow(line, linelen);
 	}
 	
 	free(line);
@@ -373,9 +387,9 @@ void DrawRows(struct abuf *ab)
 		
 		else
 		{
-			int len = E.row.size;
+			int len = E.row[x].size;
 			if (len > E.screencols) len = E.screencols;
-			abAppend(ab, E.row.chars, len);
+			abAppend(ab, E.row[x].chars, len);
 		}	
 		if (x < E.screenrows - 1) 
 		{
