@@ -1,2 +1,62 @@
-blablabla
+ s applications, but will cover attacking GraphQL APIs as well. You’ll first 
+learn tools and techniques for using APIs as intended. Next, you’ll probe 
+them for vulnerabilities and learn how to exploit those vulnerabilities. You 
+can then report your findings and help prevent the next data breach.
+ The Allure of Hacking Web APIs
+ In 2017, The Economist, one of the leading sources of information for inter
+national business, ran the following headline: “The world’s most valuable 
+resource is no longer oil, but data.” APIs are digital pipelines that allow a 
+precious commodity to flow across the world in the blink of an eye.
+ Simply put, an API is a technology that enables communication 
+between different applications. When, for example, a Python application 
+needs to interact with the functionality of a Java app, things can get messy 
+very quickly. By relying on APIs, developers can design modular applica
+tions that leverage the expertise of other applications. For example, they no 
+longer need to create their own custom software to implement maps, pay
+ment processors, machine-learning algorithms, or authentication processes.
+ As a result, many modern web applications have been quick to adopt 
+APIs. Yet new technologies often get quite a head start before cybersecurity 
+has a chance to ask any questions, and APIs have hugely expanded these 
+applications’ attack surfaces. They’ve been so poorly defended that attack
+ers can use them as a direct route to their data. In addition, many APIs 
+lack the security controls that other attack vectors have in place, making 
+them the equivalent of the Death Star’s thermal exhaust port: a path to 
+doom and destruction for businesses.
+ Due to these reasons, Gartner predicted years ago that by 2022, APIs 
+will be the leading attack vector. As hackers, we need to secure them by 
+putting on our rollerblades, strapping the Acme rocket to our backs, and 
+catching up to the speed of technological innovation. By attacking APIs, 
+reporting our findings, and communicating risks to the business, we can do 
+our part to thwart cybercrime.
+ This Book’s Approach
+ Attacking APIs is not as challenging as you may think. Once you under
+stand how they operate, hacking them is only a matter of issuing the right 
+HTTP requests. That said, the tools and techniques typically leveraged to 
+perform bug hunting and web application penetration testing do not trans
+late well to APIs. You can’t, for instance, throw a generic vulnerability scan 
+at an API and expect useful results. I’ve often run these scans against vul
+nerable APIs only to receive false negatives. When APIs are not tested prop
+erly, organizations are given a false sense of security that leaves them with a 
+risk of being compromised a chance to ask any questions, and APIs have hugely expanded these 
+applications’ attack surfaces. They’ve been so poorly defended that attack
+ers can use them as a direct route to their data. In addition, many APIs 
+lack the security controls that other attack vectors have in place, making 
+them the equivalent of the Death Star’s thermal exhaust port: a path to 
+doom and destruction for businesses.
+ Due to these reasons, Gartner predicted years ago that by 2022, APIs 
+will be the leading attack vector. As hackers, we need to secure them by 
+putting on our rollerblades, strapping the Acme rocket to our backs, and 
+catching up to the speed of technological innovation. By attacking APIs, 
+reporting our findings, and communicating risks to the business, we can do 
+our part to thwart cybercrime.
+ This Book’s Approach
+ Attacking APIs is not as challenging as you may think. Once you under
+stand how they operate, hacking them is only a matter of issuing the right 
+HTTP requests. That said, the tools and techniques typically leveraged to 
+perform bug hunting and web application penetration testing do not trans
+late well to APIs. You can’t, for instance, throw a generic vulnerability scan 
+at an API and expect useful results. I’ve often run these scans against vul
+nerable APIs only to receive false negatives. When APIs are not tested prop
+erly, organizations are given a false sense of security that leaves them with a 
+risk of being compromised
 shuvaaaa

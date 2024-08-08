@@ -43,6 +43,8 @@ typedef struct editorRow
 
 struct editorConfiguration{
 	int cursor_x, cursor_y;
+	int rowoffset;		// keeps track of what row of the file the user is currently scrolled to
+	int coloffset;
 	int screenrows;
 	int screencols;
 	int numrows;
@@ -199,17 +201,14 @@ void MoveCursor(int key)
 		break;
 
 		case ARROW_DOWN:
-		if (E.cursor_y != E.screenrows - 1)
+		if (E.cursor_y < E.numrows) 	// this helps us to scroll the entire file as opposed to the bottom of the screen
 		{
 			E.cursor_y++;
 		}
 		break;
 
 		case ARROW_RIGHT:
-		if (E.cursor_x != E.screencols - 1)
-		{
 			E.cursor_x++;
-		}
 		break;
 
 		case ARROW_UP:
@@ -349,12 +348,39 @@ void abFree(struct abuf *ab)
 
 
 /*** character output ***/
+// checks if the cursor has moved outside of the visible window and if so, we adjust the row offset value
+void editorScroll()
+{
+	// checks if the cursor is in the visible window and if so, scrolls upto where the cursor is
+	if (E.cursor_y < E.rowoffset)
+	{
+		E.rowoffset = E.cursor_y;
+	}
+	
+	// checks if the cursor is past the bottom of the visible window
+	if (E.cursor_y >= E.rowoffset + E.screenrows)
+	{
+		E.rowoffset = E.cursor_y - E.screenrows + 1;
+	}
+
+	if (E.cursor_x < E.coloffset)
+	{
+		E.coloffset = E.cursor_x;
+	}
+	
+	if (E.cursor_x >= E.coloffset + E.screencols)
+	{
+		E.coloffset = E.cursor_x - E.screencols + 1;
+	}
+}
+
 void DrawRows(struct abuf *ab)
 {
 	int x;
 	for (x = 0; x <= E.screenrows; x++)
 	{
-		if (x >= E.numrows)
+		int filerow = x + E.rowoffset;	
+		if (filerow >= E.numrows)
 		{
 			if (E.numrows == 0 && x == E.screenrows / 3)		// in case we have no file passed as argument, it will show the welcome sign. 
 			{
@@ -387,9 +413,10 @@ void DrawRows(struct abuf *ab)
 		
 		else
 		{
-			int len = E.row[x].size;
+			int len = E.row[filerow].size - E.coloffset;
+			if (len < 0) len = 0;
 			if (len > E.screencols) len = E.screencols;
-			abAppend(ab, E.row[x].chars, len);
+			abAppend(ab, &E.row[filerow].chars[E.coloffset], len);
 		}	
 		if (x < E.screenrows - 1) 
 		{
@@ -400,6 +427,7 @@ void DrawRows(struct abuf *ab)
 
 void RefreshScreen()
 {
+	editorScroll();
 	// \x1b is the escape character or 27 in decimal and each escape sequence starts with an escape character followed by a { character.
 	// escape sequences instruct the terminal to do various text formatting tasks such as colouring texts, moving the cursor, clearing parts of the screen, etc.
 	// J is used as the erase in display to clear the screen http://vt100.net/docs/vt100-ug/chapter3.html#ED
@@ -421,7 +449,7 @@ void RefreshScreen()
 	// We changed the old H command with the H command with arguments, specifying the exact position we want the cursor to move to.
 	// We also add 1 to both the coordinates to convert it from a 0 index value to a 1 indexed value.	
 	char buf[32];
-	snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cursor_y + 1, E.cursor_x + 1);
+	snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cursor_y - E.rowoffset) + 1, (E.cursor_x - E.coloffset) + 1);
 	abAppend(&ab, buf, strlen(buf));
 	abAppend(&ab, "\x1b[?25h", 6);
 	// instead of a number of small writes, what we have done is appended all the writes that we might have to do into a single buffer and then written it. We also have to free the allocated memory space.
@@ -438,6 +466,8 @@ void initializeEditor()
 	// this is the initial cursor position values which we have set to 0. cursor_x is the horizontal coordinate and cursor_y is the vertical coordinate.
 	E.cursor_x = 0;
 	E.cursor_y = 0;
+	E.rowoffset = 0; 	// row offset 0 means that we will be on top of the file by default
+	E.coloffset = 0;
 	E.numrows = 0;
 
 	if (getWindowSize(&E.screenrows, &E.screencols) == -1)			// We have passed the addresses of the struct members which will be used to set int references in the getWindowSize function. 
