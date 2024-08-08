@@ -191,6 +191,8 @@ void editorOpen(char* filename)
 /*** character input ***/
 void MoveCursor(int key)
 {
+	// the ternary operator checks if the cursor is on an actual line and if it is, the row variable will point to the editorRow that the cursor is on and we'll check whether E.cursor_x is to the left of the end of that line before we allow the cursor to move to the right
+	editorRow *row = (E.cursor_y >= E.numrows) ? NULL : &E.row[E.cursor_y];
 	switch (key)
 	{
 		case ARROW_LEFT:
@@ -208,7 +210,17 @@ void MoveCursor(int key)
 		break;
 
 		case ARROW_RIGHT:
+		if (row && E.cursor_x < row -> size)
+		{
 			E.cursor_x++;
+		}
+		
+		// this allows users to press -> at the end of the line to go to the beginning of the next line
+		else if (row && E.cursor_x == row -> size)
+		{
+			E.cursor_y++;
+			E.cursor_x = 0;
+		}
 		break;
 
 		case ARROW_UP:
@@ -217,6 +229,13 @@ void MoveCursor(int key)
 			E.cursor_y--;	
 		}
 		break;
+	}
+	
+	row = (E.cursor_y >= E.numrows) ? NULL : &E.row[E.cursor_y];
+	int rowlen = row ? row->size : 0;	
+	if (E.cursor_x > rowlen)
+	{
+		E.cursor_x = rowlen;
 	}
 }
 int ReadKey()
@@ -439,7 +458,7 @@ void RefreshScreen()
 	// The ?25l makes the cursor invisible the cursor is visible when the l is replaced with a h. https://vt100.net/docs/vt510-rm/DECTCEM.html
 	abAppend(&ab, "\x1b[?25l", 6);
 	// NOTE: the 2J was replaced with a K here. K erases a part of the current line and its arguments are similar to that of J, 2 erases the whole line, 1 erases the part of line to the left of the cursor and 0 erases the part of the line to the right of the cursor, and is the default argument.
-	abAppend(&ab, "\x1b[K", 4);
+	//abAppend(&ab, "\x1b[K", 4);
 
 	// This escape sequence is 3 bytes long and makes use of the H command (cursor position) to position the cursor. It takes two arguments row and column number. So, if you have a 100x50 size terminal, you can use the command <esc>[25;50H (we separate multiple commands using ;). 
 	abAppend(&ab, "\x1b[H", 3);
